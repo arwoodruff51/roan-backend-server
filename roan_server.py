@@ -1,75 +1,137 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
-import os
-import json
+from flask import Flask, request, jsonify
+import google.auth
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import os
+import json
 
 app = Flask(__name__)
-CORS(app)
 
-# Load credentials from Railway environment variable
-def get_google_creds():
-    token_json = os.getenv("GOOGLE_TOKEN")
-    if not token_json:
-        raise ValueError("GOOGLE_TOKEN not set in environment variables")
-    token_data = json.loads(token_json)
-    return Credentials.from_authorized_user_info(token_data)
+# Load credentials from environment variable
+creds_data = os.environ.get("GOOGLE_TOKEN") or os.environ.get("RAILWAY_TOKEN_JSON")
+if not creds_data:
+    raise Exception("Missing Google OAuth token data in environment variables.")
+creds_dict = json.loads(creds_data)
+creds = Credentials.from_authorized_user_info(info=creds_dict)
 
-@app.route("/")
-def home():
-    return "Roan Universal Google API Server is Running"
-
-# Calendar - Get ALL Events
-@app.route("/calendar/all")
+# === GOOGLE CALENDAR ===
+@app.route('/calendar/all', methods=['GET'])
 def get_calendar_events():
-    creds = get_google_creds()
-    service = build("calendar", "v3", credentials=creds)
-    events_result = service.events().list(calendarId='primary', maxResults=2500).execute()
-    return jsonify(events_result.get("items", []))
+    service = build('calendar', 'v3', credentials=creds)
+    events_result = service.events().list(calendarId='primary', maxResults=2500, singleEvents=True,
+                                          orderBy='startTime').execute()
+    return jsonify(events_result.get('items', []))
 
-# Gmail - Get ALL Threads
-@app.route("/gmail/threads")
+@app.route('/calendar/create', methods=['POST'])
+def create_calendar_event():
+    service = build('calendar', 'v3', credentials=creds)
+    event = request.json
+    created_event = service.events().insert(calendarId='primary', body=event).execute()
+    return jsonify(created_event)
+
+# === GMAIL ===
+@app.route('/gmail/threads', methods=['GET'])
 def get_gmail_threads():
-    creds = get_google_creds()
-    service = build("gmail", "v1", credentials=creds)
-    threads = []
-    next_page_token = None
-    while True:
-        response = service.users().threads().list(userId="me", pageToken=next_page_token).execute()
-        threads.extend(response.get("threads", []))
-        next_page_token = response.get("nextPageToken")
-        if not next_page_token:
-            break
-    return jsonify(threads)
+    service = build('gmail', 'v1', credentials=creds)
+    threads = service.users().threads().list(userId='me', maxResults=500).execute()
+    thread_data = []
+    for t in threads.get('threads', []):
+        thread = service.users().threads().get(userId='me', id=t['id']).execute()
+        thread_data.append(thread)
+    return jsonify(thread_data)
 
-# Drive - Get ALL Files
-@app.route("/drive/files")
-def get_drive_files():
-    creds = get_google_creds()
-    service = build("drive", "v3", credentials=creds)
-    files = []
-    page_token = None
-    while True:
-        response = service.files().list(q="'me' in owners", pageSize=1000, pageToken=page_token).execute()
-        files.extend(response.get("files", []))
-        page_token = response.get("nextPageToken")
-        if not page_token:
-            break
-    return jsonify(files)
+@app.route('/gmail/send', methods=['POST'])
+def send_email():
+    from base64 import urlsafe_b64encode
+    from email.mime.text import MIMEText
 
-# Tasks - Get ALL Task Lists and Tasks
-@app.route("/tasks/all")
-def get_all_tasks():
-    creds = get_google_creds()
-    service = build("tasks", "v1", credentials=creds)
-    tasklists = service.tasklists().list(maxResults=100).execute().get("items", [])
-    all_tasks = []
-    for tasklist in tasklists:
-        tasks = service.tasks().list(tasklist=tasklist["id"], maxResults=500).execute().get("items", [])
-        all_tasks.extend(tasks)
-    return jsonify(all_tasks)
+    service = build('gmail', 'v1', credentials=creds)
+    data = request.json
+    message = MIMEText(data['body'])
+    message['to'] = data['to']
+    message['subject'] = data['subject']
+    raw = urlsafe_b64encode(message.as_bytes()).decode()
+    body = {'raw': raw}
+    sent_message = service.users().messages().send(userId='me', body=body).execute()
+    return jsonify(sent_message)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+# === GOOGLE DRIVE ===
+@app.route('/drive/files', methods=['GET'])
+def list_drive_files():
+    service = build('drive', 'v3', credentials=creds)
+    results = service.files().list(pageSize=500, fields="files(id, name, mimeType, modifiedTime)").execute()
+    return jsonify(results.get('files', []))
+
+@app.route('/drive/upload', methods=['POST'])
+def upload_file():
+    from googleapiclient.http import MediaFileUpload
+
+    service = build('drive', 'v3', credentials=creds)
+    file_name = request.json['file_name']
+    file_path = request.json['file_path']
+    file_metadata = {'name': file_name}
+    media = MediaFileUpload(file_path, resumable=True)
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    return jsonify(file)
+
+# === GOOGLE TASKS ===
+@app.route('/tasks/all', methods=['GET'])
+def get_tasks():
+    service = build('tasks', 'v1', credentials=creds)
+    tasklists = service.tasklists().list(maxResults=100).execute().get('items', [])
+    tasks = {}
+    for tl in tasklists:
+        task_items = service.tasks().list(tasklist=tl['id']).execute().get('items', [])
+        tasks[tl['title']] = task_items
+    return jsonify(tasks)
+
+@app.route('/tasks/add', methods=['POST'])
+def add_task():
+    service = build('tasks', 'v1', credentials=creds)
+    tasklist_id = request.json['tasklist_id']
+    task = request.json['task']
+    created = service.tasks().insert(tasklist=tasklist_id, body=task).execute()
+    return jsonify(created)
+
+@app.route('/tasks/edit', methods=['PUT'])
+def edit_task():
+    service = build('tasks', 'v1', credentials=creds)
+    tasklist_id = request.json['tasklist_id']
+    task_id = request.json['task_id']
+    updated_task = request.json['task']
+    updated = service.tasks().update(tasklist=tasklist_id, task=task_id, body=updated_task).execute()
+    return jsonify(updated)
+
+# === GOOGLE CONTACTS ===
+@app.route('/contacts/search', methods=['POST'])
+def search_contacts():
+    service = build('people', 'v1', credentials=creds)
+    query = request.json['query']
+    result = service.people().searchContacts(query=query, readMask="names,emailAddresses").execute()
+    return jsonify(result)
+
+@app.route('/contacts/create', methods=['POST'])
+def create_contact():
+    service = build('people', 'v1', credentials=creds)
+    contact = request.json['contact']
+    result = service.people().createContact(body=contact).execute()
+    return jsonify(result)
+
+@app.route('/contacts/update', methods=['PUT'])
+def update_contact():
+    service = build('people', 'v1', credentials=creds)
+    resource_name = request.json['resourceName']
+    update_fields = request.json['update']
+    result = service.people().updateContact(resourceName=resource_name, updatePersonFields="names,emailAddresses",
+                                            body=update_fields).execute()
+    return jsonify(result)
+
+@app.route('/contacts/delete', methods=['DELETE'])
+def delete_contact():
+    service = build('people', 'v1', credentials=creds)
+    resource_name = request.json['resourceName']
+    service.people().deleteContact(resourceName=resource_name).execute()
+    return jsonify({'status': 'deleted'})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
