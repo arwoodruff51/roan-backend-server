@@ -10,7 +10,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# === CREDENTIAL SETUP WITH LOGGING ===
+# === CREDENTIAL SETUP WITH EXTENDED DIAGNOSTICS ===
 creds_data = os.environ.get("GOOGLE_TOKEN")
 if creds_data:
     print("🟢 Loaded GOOGLE_TOKEN from environment")
@@ -25,7 +25,10 @@ else:
 try:
     creds_dict = json.loads(creds_data)
     creds = Credentials.from_authorized_user_info(info=creds_dict)
-    print("✅ Token loaded. Scopes:", creds.scopes)
+    print("✅ Token loaded.")
+    print("🔎 Is valid:", creds.valid)
+    print("🔁 Expired:", creds.expired)
+    print("🔑 Has refresh token:", bool(creds.refresh_token))
 except Exception as e:
     print("❌ Failed to parse credentials:", e)
     raise
@@ -199,3 +202,5 @@ def delete_contact():
 
 print("🚀 Flask app initialized and ready for Gunicorn.")
 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
