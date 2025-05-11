@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 import os
 import json
 import datetime
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
 app = Flask(__name__)
 
-# === Credential Handling with Logging ===
+# === CREDENTIALS LOADING WITH DEBUG ===
 creds_data = os.environ.get("GOOGLE_TOKEN")
 if creds_data:
     print("🟢 Loaded GOOGLE_TOKEN from environment")
@@ -30,12 +30,10 @@ except Exception as e:
 # === GOOGLE CALENDAR ===
 @app.route('/calendar/all', methods=['GET'])
 def get_calendar_events():
-    print("📅 /calendar/all called")
     try:
+        print("📅 Fetching calendar events...")
         service = build('calendar', 'v3', credentials=creds)
         now = datetime.datetime.utcnow().isoformat() + 'Z'
-        print("🔍 Fetching events after:", now)
-
         events_result = service.events().list(
             calendarId='primary',
             timeMin=now,
@@ -43,18 +41,12 @@ def get_calendar_events():
             singleEvents=True,
             orderBy='startTime'
         ).execute()
-
         events = events_result.get('items', [])
-        print(f"📦 Retrieved {len(events)} events")
+        print(f"✅ Fetched {len(events)} events")
         return jsonify(events)
     except Exception as e:
         print("❌ ERROR in /calendar/all:", e)
         return jsonify({'error': str(e)}), 500
-
-# === ROOT TEST ROUTE ===
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({'status': '🟢 Server is running!'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
