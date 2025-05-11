@@ -1,79 +1,113 @@
-
 from flask import Flask, request, jsonify
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from flask_cors import CORS
+from google.oauth2.credentials import Credentials
 import os
 import json
+import traceback
 
 app = Flask(__name__)
-CORS(app)
 
-# Load Google OAuth credentials from environment with debug logging
-creds_data = os.environ.get("GOOGLE_TOKEN") or os.environ.get("RAILWAY_TOKEN_JSON")
-if not creds_data:
-    print("❌ No token data found in environment variables.")
-    raise Exception("Missing Google OAuth token data in environment variables.")
+# === LOAD CREDENTIALS WITH DEBUG ===
+creds_data = os.environ.get("GOOGLE_TOKEN")
+if creds_data:
+    print("🟢 Loaded GOOGLE_TOKEN from environment")
+else:
+    creds_data = os.environ.get("RAILWAY_TOKEN_JSON")
+    if creds_data:
+        print("🟡 GOOGLE_TOKEN not found, using RAILWAY_TOKEN_JSON")
+    else:
+        print("❌ No Google token found in either variable")
+        raise Exception("Missing Google OAuth token data in environment variables.")
 
 try:
     creds_dict = json.loads(creds_data)
     creds = Credentials.from_authorized_user_info(info=creds_dict)
     print("✅ Token loaded. Scopes:", creds.scopes)
 except Exception as e:
-    print("❌ Failed to parse credentials:", e)
+    print("❌ Failed to load credentials:", e)
+    traceback.print_exc()
     raise
 
-@app.route("/calendar/all", methods=["GET"])
+# === CALENDAR ===
+@app.route('/calendar/all', methods=['GET'])
 def get_calendar_events():
     try:
-        service = build("calendar", "v3", credentials=creds)
-        now = "2025-01-01T00:00:00Z"
-        events = service.events().list(calendarId='primary', timeMin=now, maxResults=10, singleEvents=True, orderBy='startTime').execute()
-        return jsonify(events.get("items", []))
+        service = build('calendar', 'v3', credentials=creds)
+        print("📅 Calendar API client initialized")
+        events_result = service.events().list(
+            calendarId='primary',
+            maxResults=2500,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        return jsonify(events_result.get('items', []))
     except Exception as e:
-        print("❌ Calendar endpoint failed:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Calendar fetch failed:", e)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-@app.route("/gmail/threads", methods=["GET"])
+# === GMAIL ===
+@app.route('/gmail/threads', methods=['GET'])
 def get_gmail_threads():
     try:
-        service = build("gmail", "v1", credentials=creds)
-        threads = service.users().threads().list(userId='me', maxResults=10).execute()
-        return jsonify(threads.get("threads", []))
+        service = build('gmail', 'v1', credentials=creds)
+        print("📧 Gmail API client initialized")
+        threads = service.users().threads().list(userId='me', maxResults=50).execute()
+        return jsonify(threads.get('threads', []))
     except Exception as e:
-        print("❌ Gmail endpoint failed:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Gmail fetch failed:", e)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-@app.route("/drive/files", methods=["GET"])
+# === DRIVE ===
+@app.route('/drive/files', methods=['GET'])
 def list_drive_files():
     try:
-        service = build("drive", "v3", credentials=creds)
-        results = service.files().list(pageSize=10, fields="files(id, name)").execute()
-        return jsonify(results.get("files", []))
+        service = build('drive', 'v3', credentials=creds)
+        print("📂 Drive API client initialized")
+        results = service.files().list(
+            pageSize=100,
+            fields="files(id, name, mimeType, modifiedTime)"
+        ).execute()
+        return jsonify(results.get('files', []))
     except Exception as e:
-        print("❌ Drive endpoint failed:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Drive fetch failed:", e)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-@app.route("/tasks/all", methods=["GET"])
+# === TASKS ===
+@app.route('/tasks/all', methods=['GET'])
 def get_tasks():
     try:
-        service = build("tasks", "v1", credentials=creds)
-        tasklists = service.tasklists().list().execute().get('items', [])
-        return jsonify(tasklists)
+        service = build('tasks', 'v1', credentials=creds)
+        print("✅ Tasks API client initialized")
+        tasklists = service.tasklists().list(maxResults=100).execute().get('items', [])
+        all_tasks = {}
+        for tl in tasklists:
+            tasks = service.tasks().list(tasklist=tl['id']).execute().get('items', [])
+            all_tasks[tl['title']] = tasks
+        return jsonify(all_tasks)
     except Exception as e:
-        print("❌ Tasks endpoint failed:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Tasks fetch failed:", e)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-@app.route("/contacts/search", methods=["POST"])
+# === CONTACTS ===
+@app.route('/contacts/search', methods=['POST'])
 def search_contacts():
     try:
-        service = build("people", "v1", credentials=creds)
-        query = request.json.get("query", "")
-        results = service.people().searchContacts(query=query, readMask="names,emailAddresses").execute()
+        service = build('people', 'v1', credentials=creds)
+        print("📇 People API client initialized")
+        query = request.json.get('query', '')
+        results = service.people().searchContacts(
+            query=query,
+            readMask='names,emailAddresses'
+        ).execute()
         return jsonify(results)
     except Exception as e:
-        print("❌ Contacts search failed:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Contact search failed:", e)
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000)
