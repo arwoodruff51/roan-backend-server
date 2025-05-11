@@ -1,36 +1,53 @@
-from flask import Flask, request, jsonify
 import os
 import datetime
-from google.oauth2 import service_account
+import json
+from flask import Flask, request, jsonify
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 app = Flask(__name__)
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-SERVICE_ACCOUNT_FILE = 'Credentials.json'
+# Try to load credentials from token.json
+creds = None
+if os.path.exists("token.json"):
+    creds = Credentials.from_authorized_user_file("token.json")
+else:
+    print("⚠️ Warning: token.json not found. Google API functionality will not work.")
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
-)
-service = build('calendar', 'v3', credentials=credentials)
+@app.route("/")
+def home():
+    return "Roan Assistant Backend is live!"
 
-@app.route('/calendar/all', methods=['GET'])
-def get_all_calendar_events():
+@app.route("/calendar/all", methods=["GET"])
+def get_calendar_events():
+    if not creds:
+        return jsonify({"error": "Google credentials not found."}), 500
+
+    service = build("calendar", "v3", credentials=creds)
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    end = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).isoformat()
+    later = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).isoformat()
 
     events_result = service.events().list(
-        calendarId='primary',
+        calendarId="primary",
         timeMin=now,
-        timeMax=end,
-        maxResults=20,
+        timeMax=later,
         singleEvents=True,
-        orderBy='startTime'
+        orderBy="startTime"
     ).execute()
 
-    events = events_result.get('items', [])
+    events = events_result.get("items", [])
     return jsonify(events)
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+@app.route("/gmail/messages", methods=["GET"])
+def get_gmail_messages():
+    if not creds:
+        return jsonify({"error": "Google credentials not found."}), 500
+
+    service = build("gmail", "v1", credentials=creds)
+    results = service.users().messages().list(userId="me", maxResults=10).execute()
+    messages = results.get("messages", [])
+    return jsonify(messages)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5050))
+    app.run(host="0.0.0.0", port=port)
