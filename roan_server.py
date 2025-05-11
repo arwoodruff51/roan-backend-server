@@ -8,12 +8,25 @@ import datetime
 
 app = Flask(__name__)
 
-# Load credentials from environment variable
-creds_data = os.environ.get("GOOGLE_TOKEN") or os.environ.get("RAILWAY_TOKEN_JSON")
-if not creds_data:
-    raise Exception("Missing Google OAuth token data in environment variables.")
-creds_dict = json.loads(creds_data)
-creds = Credentials.from_authorized_user_info(info=creds_dict)
+# Load credentials from environment variable with detailed logging
+creds_data = os.environ.get("GOOGLE_TOKEN")
+if creds_data:
+    print("🟢 Loaded GOOGLE_TOKEN from environment")
+else:
+    creds_data = os.environ.get("RAILWAY_TOKEN_JSON")
+    if creds_data:
+        print("🟡 GOOGLE_TOKEN not found, using RAILWAY_TOKEN_JSON")
+    else:
+        print("❌ No Google token found in either variable")
+        raise Exception("Missing Google OAuth token data in environment variables.")
+
+try:
+    creds_dict = json.loads(creds_data)
+    creds = Credentials.from_authorized_user_info(info=creds_dict)
+    print("✅ Token loaded. Scopes:", creds.scopes)
+except Exception as e:
+    print("❌ Failed to parse credentials:", e)
+    raise
 
 # === GOOGLE CALENDAR ===
 @app.route('/calendar/all', methods=['GET'])
