@@ -1,49 +1,77 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from flask_cors import CORS
-import datetime
-import os
-import json
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import os
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-# Get token from Railway environment variable
-token_str = os.environ.get('GOOGLE_TOKEN') or os.environ.get('RAILWAY_TOKEN_JSON')
+# Load token from Railway environment variable
+token_str = os.getenv("GOOGLE_TOKEN") or os.getenv("RAILWAY_TOKEN_JSON")
+if not token_str:
+    raise Exception("Google token not found in environment variables.")
 
-if token_str is None:
-    raise ValueError("Missing GOOGLE_TOKEN or RAILWAY_TOKEN_JSON in environment variables.")
+token_data = json.loads(token_str)
+creds = Credentials.from_authorized_user_info(token_data)
 
-try:
-    token_data = json.loads(token_str)
-    creds = Credentials.from_authorized_user_info(info=token_data)
-except Exception as e:
-    raise RuntimeError(f"Failed to load credentials: {e}")
-
-@app.route('/')
-def root():
-    return "Roan Backend is running."
-
-@app.route('/calendar/all', methods=['GET'])
+# ---- CALENDAR ----
+@app.route("/calendar/all")
 def get_calendar_events():
-    try:
-        service = build('calendar', 'v3', credentials=creds)
+    service = build("calendar", "v3", credentials=creds)
+    events = service.events().list(
+        calendarId='primary',
+        maxResults=10,
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+    return jsonify(events.get('items', []))
 
-        start = request.args.get('start', datetime.datetime.utcnow().isoformat() + 'Z')
-        end = request.args.get('end', (datetime.datetime.utcnow() + datetime.timedelta(days=30)).isoformat() + 'Z')
+# ---- GMAIL ----
+@app.route("/gmail/all")
+def get_gmail_messages():
+    service = build("gmail", "v1", credentials=creds)
+    results = service.users().messages().list(userId='me', maxResults=5).execute()
+    messages = results.get("messages", [])
+    output = []
 
-        events_result = service.events().list(
-            calendarId='primary', timeMin=start, timeMax=end,
-            singleEvents=True, orderBy='startTime'
-        ).execute()
+    for msg in messages:
+        msg_detail = service.users().messages().get(userId='me', id=msg["id"]).execute()
+        output.append({
+            "id": msg["id"],
+            "snippet": msg_detail.get("snippet"),
+            "labelIds": msg_detail.get("labelIds", [])
+        })
 
-        events = events_result.get('items', [])
-        return jsonify(events)
+    return jsonify(output)
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# ---- DRIVE ----
+@app.route("/drive/all")
+def get_drive_files():
+    service = build("drive", "v3", credentials=creds)
+    files = service.files().list(
+        pageSize=10,
+        fields="files(id, name, mimeType, modifiedTime)"
+    ).execute()
+    return jsonify(files.get("files", []))
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5050))  # Use Railway-assigned port or default to 5050
-    app.run(host='0.0.0.0', port=port)
+# ---- TASKS ----
+@app.route("/tasks/all")
+def get_tasks():
+    service = build("tasks", "v1", credentials=creds)
+    tasklists = service.tasklists().list(maxResults=10).execute().get("items", [])
+    all_tasks = []
+
+    for tasklist in tasklists:
+        tasks = service.tasks().list(tasklist=tasklist["id"]).execute().get("items", [])
+        all_tasks.append({
+            "tasklist": tasklist["title"],
+            "tasks": tasks
+        })
+
+    return jsonify(all_tasks)
+
+# ---- MAIN ----
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
