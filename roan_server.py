@@ -13,21 +13,21 @@ CORS(app)
 # === LOAD GOOGLE CREDENTIALS WITH DEBUG ===
 creds_data = os.environ.get("GOOGLE_TOKEN")
 if creds_data:
-    print("🟢 Loaded GOOGLE_TOKEN from environment")
+    print("🟢 Loaded GOOGLE_TOKEN from environment", flush=True)
 else:
     creds_data = os.environ.get("RAILWAY_TOKEN_JSON")
     if creds_data:
-        print("🟡 GOOGLE_TOKEN not found, using RAILWAY_TOKEN_JSON")
+        print("🟡 GOOGLE_TOKEN not found, using RAILWAY_TOKEN_JSON", flush=True)
     else:
-        print("❌ No Google token found in either variable")
+        print("❌ No Google token found in either variable", flush=True)
         raise Exception("Missing Google OAuth token data")
 
 try:
     creds_dict = json.loads(creds_data)
     creds = Credentials.from_authorized_user_info(info=creds_dict)
-    print("✅ Token loaded. Scopes:", creds.scopes)
+    print("✅ Token loaded. Scopes:", creds.scopes, flush=True)
 except Exception as e:
-    print("❌ Failed to parse credentials:", e)
+    print("❌ Failed to parse credentials:", e, flush=True)
     raise
 
 # === GOOGLE CALENDAR ===
@@ -42,7 +42,7 @@ def get_calendar_events():
         events = events_result.get('items', [])
         return jsonify(events)
     except Exception as e:
-        print("❌ ERROR in /calendar/all:", e)
+        print("❌ ERROR in /calendar/all:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/calendar/create', methods=['POST'])
@@ -53,7 +53,7 @@ def create_calendar_event():
         created_event = service.events().insert(calendarId='primary', body=event).execute()
         return jsonify(created_event)
     except Exception as e:
-        print("❌ ERROR in /calendar/create:", e)
+        print("❌ ERROR in /calendar/create:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 # === GMAIL ===
@@ -64,7 +64,7 @@ def get_gmail_threads():
         threads = service.users().threads().list(userId='me', maxResults=10).execute()
         return jsonify(threads.get('threads', []))
     except Exception as e:
-        print("❌ ERROR in /gmail/threads:", e)
+        print("❌ ERROR in /gmail/threads:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/gmail/send', methods=['POST'])
@@ -82,7 +82,7 @@ def send_email():
         sent_message = service.users().messages().send(userId='me', body=body).execute()
         return jsonify(sent_message)
     except Exception as e:
-        print("❌ ERROR in /gmail/send:", e)
+        print("❌ ERROR in /gmail/send:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 # === GOOGLE DRIVE ===
@@ -93,7 +93,7 @@ def list_drive_files():
         results = service.files().list(pageSize=50, fields="files(id, name, mimeType)").execute()
         return jsonify(results.get('files', []))
     except Exception as e:
-        print("❌ ERROR in /drive/files:", e)
+        print("❌ ERROR in /drive/files:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/drive/upload', methods=['POST'])
@@ -107,7 +107,7 @@ def upload_file():
         file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return jsonify(file)
     except Exception as e:
-        print("❌ ERROR in /drive/upload:", e)
+        print("❌ ERROR in /drive/upload:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 # === GOOGLE TASKS ===
@@ -122,7 +122,7 @@ def get_tasks():
             results[tl['title']] = tasks
         return jsonify(results)
     except Exception as e:
-        print("❌ ERROR in /tasks/all:", e)
+        print("❌ ERROR in /tasks/all:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/tasks/add', methods=['POST'])
@@ -133,7 +133,7 @@ def add_task():
         task = service.tasks().insert(tasklist=data['tasklist_id'], body=data['task']).execute()
         return jsonify(task)
     except Exception as e:
-        print("❌ ERROR in /tasks/add:", e)
+        print("❌ ERROR in /tasks/add:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 # === GOOGLE CONTACTS ===
@@ -145,7 +145,7 @@ def search_contacts():
         result = service.people().searchContacts(query=query, readMask="names,emailAddresses").execute()
         return jsonify(result)
     except Exception as e:
-        print("❌ ERROR in /contacts/search:", e)
+        print("❌ ERROR in /contacts/search:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/contacts/create', methods=['POST'])
@@ -156,7 +156,7 @@ def create_contact():
         created = service.people().createContact(body=contact).execute()
         return jsonify(created)
     except Exception as e:
-        print("❌ ERROR in /contacts/create:", e)
+        print("❌ ERROR in /contacts/create:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/contacts/update', methods=['PUT'])
@@ -170,7 +170,7 @@ def update_contact():
                                                  body=update_fields).execute()
         return jsonify(updated)
     except Exception as e:
-        print("❌ ERROR in /contacts/update:", e)
+        print("❌ ERROR in /contacts/update:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/contacts/delete', methods=['DELETE'])
@@ -181,7 +181,7 @@ def delete_contact():
         service.people().deleteContact(resourceName=resource_name).execute()
         return jsonify({'status': 'deleted'})
     except Exception as e:
-        print("❌ ERROR in /contacts/delete:", e)
+        print("❌ ERROR in /contacts/delete:", e, flush=True)
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
