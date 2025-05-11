@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import google.auth
+import google.auth.transport.requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import os
@@ -10,27 +10,28 @@ import datetime
 app = Flask(__name__)
 CORS(app)
 
-# === CREDENTIAL SETUP WITH EXTENDED DIAGNOSTICS ===
-creds_data = os.environ.get("GOOGLE_TOKEN")
-if creds_data:
-    print("🟢 Loaded GOOGLE_TOKEN from environment")
-else:
-    creds_data = os.environ.get("RAILWAY_TOKEN_JSON")
-    if creds_data:
-        print("🟡 GOOGLE_TOKEN not found, using RAILWAY_TOKEN_JSON")
-    else:
-        print("❌ No Google token found in either variable")
-        raise Exception("Missing Google OAuth token data in environment variables.")
+# === LOAD + REFRESH GOOGLE CREDENTIALS ===
+creds_data = os.environ.get("GOOGLE_TOKEN") or os.environ.get("RAILWAY_TOKEN_JSON")
+if not creds_data:
+    print("❌ No Google token found in environment variables.")
+    raise Exception("Missing Google OAuth token")
 
 try:
     creds_dict = json.loads(creds_data)
     creds = Credentials.from_authorized_user_info(info=creds_dict)
+
     print("✅ Token loaded.")
     print("🔎 Is valid:", creds.valid)
     print("🔁 Expired:", creds.expired)
     print("🔑 Has refresh token:", bool(creds.refresh_token))
+
+    if creds and creds.expired and creds.refresh_token:
+        print("🔄 Attempting token refresh...")
+        creds.refresh(google.auth.transport.requests.Request())
+        print("✅ Token successfully refreshed.")
+
 except Exception as e:
-    print("❌ Failed to parse credentials:", e)
+    print("❌ Failed to initialize or refresh credentials:", e)
     raise
 
 # === CALENDAR ===
@@ -40,19 +41,16 @@ def get_calendar_events():
         service = build('calendar', 'v3', credentials=creds)
         now = datetime.datetime.utcnow().isoformat() + 'Z'
         print("🔍 Calling Google Calendar API from time:", now)
-
-        events_result = service.events().list(
+        events = service.events().list(
             calendarId='primary',
             timeMin=now,
             maxResults=10,
             singleEvents=True,
             orderBy='startTime'
         ).execute()
-
-        print("📥 Raw response from Google Calendar:", json.dumps(events_result, indent=2))
-        return jsonify(events_result.get('items', []))
+        return jsonify(events.get('items', []))
     except Exception as e:
-        print("❌ ERROR in /calendar/all:", repr(e))
+        print("❌ ERROR in /calendar/all:", e)
         return jsonify({'error': str(e)}), 500
 
 # === GMAIL ===
@@ -61,11 +59,11 @@ def get_gmail_threads():
     try:
         service = build('gmail', 'v1', credentials=creds)
         threads = service.users().threads().list(userId='me', maxResults=500).execute()
-        data = []
+        full_threads = []
         for t in threads.get('threads', []):
-            thread = service.users().threads().get(userId='me', id=t['id']).execute()
-            data.append(thread)
-        return jsonify(data)
+            full = service.users().threads().get(userId='me', id=t['id']).execute()
+            full_threads.append(full)
+        return jsonify(full_threads)
     except Exception as e:
         print("❌ ERROR in /gmail/threads:", e)
         return jsonify({'error': str(e)}), 500
@@ -75,15 +73,13 @@ def send_email():
     try:
         from base64 import urlsafe_b64encode
         from email.mime.text import MIMEText
-
         service = build('gmail', 'v1', credentials=creds)
         data = request.json
         message = MIMEText(data['body'])
         message['to'] = data['to']
         message['subject'] = data['subject']
         raw = urlsafe_b64encode(message.as_bytes()).decode()
-        body = {'raw': raw}
-        result = service.users().messages().send(userId='me', body=body).execute()
+        result = service.users().messages().send(userId='me', body={'raw': raw}).execute()
         return jsonify(result)
     except Exception as e:
         print("❌ ERROR in /gmail/send:", e)
@@ -94,10 +90,7 @@ def send_email():
 def list_drive_files():
     try:
         service = build('drive', 'v3', credentials=creds)
-        results = service.files().list(
-            pageSize=100,
-            fields="files(id, name, mimeType, modifiedTime)"
-        ).execute()
+        results = service.files().list(pageSize=100, fields="files(id, name, mimeType, modifiedTime)").execute()
         return jsonify(results.get('files', []))
     except Exception as e:
         print("❌ ERROR in /drive/files:", e)
@@ -107,13 +100,12 @@ def list_drive_files():
 def upload_file():
     try:
         from googleapiclient.http import MediaFileUpload
-
         service = build('drive', 'v3', credentials=creds)
         file_name = request.json['file_name']
         file_path = request.json['file_path']
-        file_metadata = {'name': file_name}
         media = MediaFileUpload(file_path, resumable=True)
-        file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        metadata = {'name': file_name}
+        file = service.files().create(body=metadata, media_body=media, fields='id').execute()
         return jsonify(file)
     except Exception as e:
         print("❌ ERROR in /drive/upload:", e)
@@ -140,8 +132,8 @@ def add_task():
         service = build('tasks', 'v1', credentials=creds)
         tasklist_id = request.json['tasklist_id']
         task = request.json['task']
-        created = service.tasks().insert(tasklist=tasklist_id, body=task).execute()
-        return jsonify(created)
+        result = service.tasks().insert(tasklist=tasklist_id, body=task).execute()
+        return jsonify(result)
     except Exception as e:
         print("❌ ERROR in /tasks/add:", e)
         return jsonify({'error': str(e)}), 500
@@ -152,10 +144,7 @@ def search_contacts():
     try:
         service = build('people', 'v1', credentials=creds)
         query = request.json['query']
-        result = service.people().searchContacts(
-            query=query,
-            readMask="names,emailAddresses"
-        ).execute()
+        result = service.people().searchContacts(query=query, readMask="names,emailAddresses").execute()
         return jsonify(result)
     except Exception as e:
         print("❌ ERROR in /contacts/search:", e)
