@@ -1,77 +1,78 @@
+import os
+import json
 from flask import Flask, jsonify
 from flask_cors import CORS
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-import os
-import json
 
 app = Flask(__name__)
 CORS(app)
 
 # Load token from Railway environment variable
-token_str = os.getenv("GOOGLE_TOKEN") or os.getenv("RAILWAY_TOKEN_JSON")
+token_str = os.environ.get("GOOGLE_TOKEN")
 if not token_str:
-    raise Exception("Google token not found in environment variables.")
+    raise RuntimeError("GOOGLE_TOKEN environment variable not found")
 
 token_data = json.loads(token_str)
-creds = Credentials.from_authorized_user_info(token_data)
 
-# ---- CALENDAR ----
+creds = Credentials(
+    token=token_data["token"],
+    refresh_token=token_data.get("refresh_token"),
+    token_uri=token_data["token_uri"],
+    client_id=token_data["client_id"],
+    client_secret=token_data["client_secret"],
+    scopes=token_data["scopes"],
+)
+
+# Calendar API: Fetch all events
 @app.route("/calendar/all")
 def get_calendar_events():
     service = build("calendar", "v3", credentials=creds)
-    events = service.events().list(
-        calendarId='primary',
-        maxResults=10,
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-    return jsonify(events.get('items', []))
+    events_result = service.events().list(calendarId="primary", maxResults=2500, singleEvents=True, orderBy="startTime").execute()
+    return jsonify(events_result.get("items", []))
 
-# ---- GMAIL ----
-@app.route("/gmail/all")
-def get_gmail_messages():
+# Gmail API: Fetch all threads
+@app.route("/gmail/threads")
+def get_gmail_threads():
     service = build("gmail", "v1", credentials=creds)
-    results = service.users().messages().list(userId='me', maxResults=5).execute()
-    messages = results.get("messages", [])
-    output = []
+    threads = []
+    request = service.users().threads().list(userId="me")
+    while request is not None:
+        response = request.execute()
+        threads.extend(response.get("threads", []))
+        request = service.users().threads().list_next(request, response)
+    return jsonify(threads)
 
-    for msg in messages:
-        msg_detail = service.users().messages().get(userId='me', id=msg["id"]).execute()
-        output.append({
-            "id": msg["id"],
-            "snippet": msg_detail.get("snippet"),
-            "labelIds": msg_detail.get("labelIds", [])
-        })
-
-    return jsonify(output)
-
-# ---- DRIVE ----
-@app.route("/drive/all")
+# Drive API: Fetch all files
+@app.route("/drive/files")
 def get_drive_files():
     service = build("drive", "v3", credentials=creds)
-    files = service.files().list(
-        pageSize=10,
-        fields="files(id, name, mimeType, modifiedTime)"
-    ).execute()
-    return jsonify(files.get("files", []))
+    files = []
+    page_token = None
+    while True:
+        response = service.files().list(pageToken=page_token, pageSize=1000, fields="nextPageToken, files(id, name)").execute()
+        files.extend(response.get("files", []))
+        page_token = response.get("nextPageToken", None)
+        if page_token is None:
+            break
+    return jsonify(files)
 
-# ---- TASKS ----
+# Tasks API: Fetch all tasks from all tasklists
 @app.route("/tasks/all")
-def get_tasks():
+def get_all_tasks():
     service = build("tasks", "v1", credentials=creds)
-    tasklists = service.tasklists().list(maxResults=10).execute().get("items", [])
     all_tasks = []
-
+    tasklists = service.tasklists().list(maxResults=100).execute().get("items", [])
     for tasklist in tasklists:
-        tasks = service.tasks().list(tasklist=tasklist["id"]).execute().get("items", [])
-        all_tasks.append({
-            "tasklist": tasklist["title"],
-            "tasks": tasks
-        })
-
+        tasklist_id = tasklist["id"]
+        tasks = service.tasks().list(tasklist=tasklist_id, maxResults=2500).execute().get("items", [])
+        all_tasks.extend(tasks)
     return jsonify(all_tasks)
 
-# ---- MAIN ----
+# Root endpoint for health check
+@app.route("/")
+def index():
+    return "Rōan backend is running"
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(host="0.0.0.0", port=8000)
