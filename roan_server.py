@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import google.auth
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import os
 import json
 import datetime
-from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
@@ -51,7 +51,6 @@ def get_calendar_events():
 
         print("📥 Raw response from Google Calendar:", json.dumps(events_result, indent=2))
         return jsonify(events_result.get('items', []))
-
     except Exception as e:
         print("❌ ERROR in /calendar/all:", repr(e))
         return jsonify({'error': str(e)}), 500
