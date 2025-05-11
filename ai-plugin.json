@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Roan Universal Assistant",
+  "name_for_model": "roan_universal_assistant",
+  "description_for_human": "Access calendar, Gmail, tasks, and Drive through Roan.",
+  "description_for_model": "Use this plugin to access the user's Google Calendar, Gmail, Drive, and Tasks.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://web-production-cf55.up.railway.app/openapi.yaml"
+  },
+  "logo_url": "https://web-production-cf55.up.railway.app/logo.png",
+  "contact_email": "arwoodruff@gmail.com",
+  "legal_info_url": "https://arwoodruff.github.io/roan-backend-server/privacy"
+}

@@ -1,0 +1,32 @@
+openapi: 3.0.1
+info:
+  title: Roan Assistant API
+  description: API for accessing user's Google Calendar, Drive, Tasks, and Gmail
+  version: '1.0'
+servers:
+  - url: https://web-production-cf55.up.railway.app
+paths:
+  /calendar/all:
+    get:
+      summary: Get all calendar events
+      responses:
+        '200':
+          description: A list of calendar events
+  /drive/files:
+    get:
+      summary: Get all files from Google Drive
+      responses:
+        '200':
+          description: A list of files
+  /tasks/all:
+    get:
+      summary: Get all Google Tasks
+      responses:
+        '200':
+          description: A list of tasks
+  /gmail/threads:
+    get:
+      summary: Get all Gmail threads
+      responses:
+        '200':
+          description: A list of email threads
