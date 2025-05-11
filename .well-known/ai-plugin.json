@@ -1,0 +1,18 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Roan Assistant",
+  "name_for_model": "roan_assistant",
+  "description_for_human": "Your muscle-bound assistant for Drive, Calendar, Tasks, and Gmail.",
+  "description_for_model": "Plugin that accesses a user's Google Calendar, Drive, Gmail, and Tasks through the Roan backend.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://web-production-cf55.up.railway.app/openapi.yaml"
+  },
+  "logo_url": "https://arwoodruff51.github.io/logo.png",
+  "contact_email": "woodruff.woody@gmail.com",
+  "legal_info_url": "https://arwoodruff51.github.io/terms.html"
+}
+
