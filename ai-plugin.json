@@ -2,8 +2,8 @@
   "schema_version": "v1",
   "name_for_human": "Roan Assistant",
   "name_for_model": "roan",
+  "description_for_human": "Talk to Rōan, your muscular AI assistant. He manages your life through Gmail, Calendar, Drive, Tasks, and Contacts.",
   "description_for_model": "Access Gmail, Calendar, Drive, Tasks, and Contacts for Zädi using a unified API. You do not need an API key. Ask clear commands like 'What’s on my calendar tomorrow?' or 'Upload this workout log to Drive.'",
-  "description_for_human": "Talk to Roan, your muscular AI assistant. He manages your life through Google’s APIs.",
   "auth": {
     "type": "none"
   },
