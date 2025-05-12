@@ -30,6 +30,11 @@ except Exception as e:
     print("❌ Failed to parse or refresh credentials:", e)
     raise
 
+# === Health Check Route ===
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({"status": "ok"})
+
 # === Calendar ===
 @app.route('/calendar/all', methods=['GET'])
 def get_calendar_events():
