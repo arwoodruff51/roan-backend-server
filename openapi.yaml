@@ -1,32 +1,158 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Roan Assistant API
-  description: API for accessing user's Google Calendar, Drive, Tasks, and Gmail
-  version: '1.0'
+  version: 1.0.0
+  description: API for managing Gmail, Calendar, Drive, Tasks, and Contacts for Zädi
 servers:
   - url: https://web-production-cf55.up.railway.app
 paths:
   /calendar/all:
     get:
-      summary: Get all calendar events
+      operationId: getCalendarEvents
+      summary: Get upcoming calendar events
       responses:
         '200':
           description: A list of calendar events
+  /gmail/threads:
+    get:
+      operationId: getGmailThreads
+      summary: Get Gmail threads
+      responses:
+        '200':
+          description: A list of Gmail threads
+  /gmail/send:
+    post:
+      operationId: sendEmail
+      summary: Send an email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+      responses:
+        '200':
+          description: The sent email
   /drive/files:
     get:
-      summary: Get all files from Google Drive
+      operationId: listDriveFiles
+      summary: List files in Google Drive
       responses:
         '200':
           description: A list of files
+  /drive/upload:
+    post:
+      operationId: uploadFile
+      summary: Upload a file to Drive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                file_name:
+                  type: string
+                file_path:
+                  type: string
+      responses:
+        '200':
+          description: File upload result
   /tasks/all:
     get:
-      summary: Get all Google Tasks
+      operationId: getTasks
+      summary: Get all tasks
       responses:
         '200':
-          description: A list of tasks
-  /gmail/threads:
-    get:
-      summary: Get all Gmail threads
+          description: A list of tasks grouped by task list
+  /tasks/add:
+    post:
+      operationId: addTask
+      summary: Add a task to a list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tasklist_id:
+                  type: string
+                task:
+                  type: object
       responses:
         '200':
-          description: A list of email threads
+          description: Task created
+  /contacts/search:
+    post:
+      operationId: searchContacts
+      summary: Search for a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+      responses:
+        '200':
+          description: Search results
+  /contacts/create:
+    post:
+      operationId: createContact
+      summary: Create a new contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contact:
+                  type: object
+      responses:
+        '200':
+          description: Contact created
+  /contacts/update:
+    put:
+      operationId: updateContact
+      summary: Update an existing contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resourceName:
+                  type: string
+                update:
+                  type: object
+      responses:
+        '200':
+          description: Contact updated
+  /contacts/delete:
+    delete:
+      operationId: deleteContact
+      summary: Delete a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resourceName:
+                  type: string
+      responses:
+        '200':
+          description: Contact deleted
