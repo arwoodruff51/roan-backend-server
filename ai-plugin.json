@@ -1,17 +1,18 @@
 {
   "schema_version": "v1",
-  "name_for_human": "Roan Universal Assistant",
-  "name_for_model": "roan_universal_assistant",
-  "description_for_human": "Access calendar, Gmail, tasks, and Drive through Roan.",
-  "description_for_model": "Use this plugin to access the user's Google Calendar, Gmail, Drive, and Tasks.",
+  "name_for_human": "Roan Assistant",
+  "name_for_model": "roan",
+  "description_for_model": "Access Gmail, Calendar, Drive, Tasks, and Contacts for Zädi using a unified API. You do not need an API key. Ask clear commands like 'What’s on my calendar tomorrow?' or 'Upload this workout log to Drive.'",
+  "description_for_human": "Talk to Roan, your muscular AI assistant. He manages your life through Google’s APIs.",
   "auth": {
     "type": "none"
   },
   "api": {
     "type": "openapi",
-    "url": "https://web-production-cf55.up.railway.app/openapi.yaml"
+    "url": "https://arwoodruff51.github.io/openapi.yaml",
+    "is_user_authenticated": false
   },
-  "logo_url": "https://web-production-cf55.up.railway.app/logo.png",
-  "contact_email": "arwoodruff@gmail.com",
-  "legal_info_url": "https://arwoodruff.github.io/roan-backend-server/privacy"
+  "logo_url": "https://arwoodruff51.github.io/roan_logo.png",
+  "contact_email": "your@email.com",
+  "legal_info_url": "https://arwoodruff51.github.io/privacy.html"
 }
