@@ -30,7 +30,7 @@ except Exception as e:
     print("❌ Failed to parse or refresh credentials:", e)
     raise
 
-# === Health Check Route ===
+# === Health Check ===
 @app.route("/", methods=["GET"])
 def health_check():
     return jsonify({"status": "ok"})
@@ -44,7 +44,6 @@ def get_calendar_events():
         events_result = service.events().list(calendarId='primary', timeMin=now, maxResults=10, singleEvents=True, orderBy='startTime').execute()
         return jsonify(events_result.get('items', []))
     except Exception as e:
-        print("❌ Calendar Error:", e)
         return jsonify({'error': str(e)}), 500
 
 # === Gmail ===
@@ -164,6 +163,3 @@ def delete_contact():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
-@app.route("/", methods=["GET"])
-def health_check():
-    return jsonify({"status": "ok"})
