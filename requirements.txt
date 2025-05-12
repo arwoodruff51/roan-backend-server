@@ -1,6 +1,8 @@
-flask
-flask_cors
-google-api-python-client
-google-auth
-google-auth-oauthlib
-gunicorn
+flask==3.1.0
+flask_cors==5.0.1
+google-api-python-client==2.169.0
+google-auth==2.40.1
+google-auth-oauthlib==1.2.2
+google-auth-httplib2==0.2.0
+requests-oauthlib==2.0.0
+gunicorn==23.0.0
