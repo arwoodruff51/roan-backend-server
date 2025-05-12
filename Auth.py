@@ -1,27 +1,10 @@
-from google_auth_oauthlib.flow import InstalledAppFlow
+import os
+import json
+from google.oauth2.credentials import Credentials
 
-def main():
-    # Set up the scopes you want to request
-    scopes = [
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://www.googleapis.com/auth/calendar',
-        'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/tasks',
-        'https://www.googleapis.com/auth/contacts'
-    ]
-
-    # Initialize the OAuth flow
-    flow = InstalledAppFlow.from_client_secrets_file(
-        'credentials.json', scopes=scopes)
-
-    # Run the local server flow to get the credentials
-    creds = flow.run_local_server(port=0)
-
-    # Save the credentials to a file
-    with open('token.json', 'w') as token:
-        token.write(creds.to_json())
-
-    print("✅ Authorization complete. Token saved to token.json.")
-
-if __name__ == '__main__':
-    main()
+def load_google_credentials():
+    creds_data = os.environ.get("GOOGLE_TOKEN") or os.environ.get("RAILWAY_TOKEN_JSON")
+    if not creds_data:
+        raise Exception("Missing Google OAuth token data in environment variables.")
+    creds_dict = json.loads(creds_data)
+    return Credentials.from_authorized_user_info(info=creds_dict)
