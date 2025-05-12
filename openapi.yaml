@@ -6,6 +6,13 @@ info:
 servers:
   - url: https://web-production-cf55.up.railway.app
 paths:
+  /:
+    get:
+      operationId: healthCheck
+      summary: Health check route
+      responses:
+        '200':
+          description: OK
   /calendar/all:
     get:
       operationId: getCalendarEvents
